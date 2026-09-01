@@ -249,7 +249,7 @@
   </div>
 </div>
 
-<footer>Runs entirely on your own hosted instance.</footer>
+<footer>© <span id="footerYear"></span> Latish · Invoice Extractor</footer>
 
 <script>
 const CLIENTS = [
@@ -421,6 +421,8 @@ downloadBtn.addEventListener("click", () => {
   if (!currentSessionId) return;
   window.location.href = `/api/download/${currentSessionId}`;
 });
+
+document.getElementById("footerYear").textContent = new Date().getFullYear();
 
 renderTabs();
 </script>
