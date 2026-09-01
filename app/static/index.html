@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invoice Extractor</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --card: #ffffff;
+    --primary: #4338ca;
+    --primary-dark: #3730a3;
+    --border: #e2e5ee;
+    --text: #1f2333;
+    --muted: #6b7280;
+    --error: #dc2626;
+    --success: #059669;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    background: linear-gradient(135deg, #4338ca, #6366f1);
+    color: white;
+    padding: 28px 24px;
+    text-align: center;
+  }
+  header h1 { margin: 0; font-size: 24px; font-weight: 700; }
+  header p { margin: 6px 0 0; opacity: 0.9; font-size: 14px; }
+
+  .container { max-width: 900px; margin: 0 auto; padding: 24px 16px 60px; }
+
+  .tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--card);
+    border-radius: 12px;
+    padding: 6px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    margin-bottom: 20px;
+    overflow-x: auto;
+  }
+  .tab-btn {
+    flex: 1;
+    min-width: 90px;
+    padding: 10px 12px;
+    border: none;
+    background: transparent;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .tab-btn:hover { background: #f1f2f9; }
+  .tab-btn.active { background: var(--primary); color: white; }
+
+  .card {
+    background: var(--card);
+    border-radius: 14px;
+    padding: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    margin-bottom: 20px;
+  }
+
+  .dropzone {
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 36px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .dropzone:hover, .dropzone.dragover {
+    border-color: var(--primary);
+    background: #f5f5ff;
+  }
+  .dropzone .icon { font-size: 34px; margin-bottom: 8px; }
+  .dropzone p { margin: 4px 0; color: var(--muted); font-size: 14px; }
+  .dropzone .hint { font-size: 12px; }
+  #fileInput { display: none; }
+
+  .file-list { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+  .file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8f9fc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+  .file-item .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-item button {
+    background: none;
+    border: none;
+    color: var(--error);
+    cursor: pointer;
+    font-size: 16px;
+    padding: 0 4px;
+  }
+
+  .actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
+  button.primary {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 12px 22px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  button.primary:hover { background: var(--primary-dark); }
+  button.primary:disabled { background: #a5a6c9; cursor: not-allowed; }
+  button.secondary {
+    background: white;
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 12px 22px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  button.secondary:hover { background: #f4f5f9; }
+
+  .spinner {
+    display: inline-block;
+    width: 14px; height: 14px;
+    border: 2px solid rgba(255,255,255,0.4);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .banner {
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    margin-top: 16px;
+  }
+  .banner.error { background: #fef2f2; color: var(--error); border: 1px solid #fecaca; }
+  .banner.success { background: #ecfdf5; color: var(--success); border: 1px solid #a7f3d0; }
+  .banner ul { margin: 6px 0 0; padding-left: 18px; }
+
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .results-header h3 { margin: 0; font-size: 16px; }
+  .results-header .count { color: var(--muted); font-size: 13px; }
+
+  .table-wrap {
+    overflow: auto;
+    max-height: 420px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  th, td {
+    padding: 8px 10px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  th {
+    background: #f8f9fc;
+    position: sticky;
+    top: 0;
+    font-weight: 600;
+    color: var(--muted);
+    z-index: 1;
+  }
+  tr:hover td { background: #fafafe; }
+
+  .hidden { display: none !important; }
+
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 20px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📄 Invoice Extractor</h1>
+  <p>Upload client PDFs → get a clean Excel file, instantly</p>
+</header>
+
+<div class="container">
+  <div class="tabs" id="tabs"></div>
+
+  <div class="card">
+    <div class="dropzone" id="dropzone">
+      <div class="icon">📤</div>
+      <p><strong>Click to upload</strong> or drag and drop PDF files here</p>
+      <p class="hint">Only .pdf files accepted • multiple files allowed</p>
+      <input type="file" id="fileInput" accept="application/pdf" multiple>
+    </div>
+
+    <div class="file-list" id="fileList"></div>
+
+    <div class="actions">
+      <button class="primary" id="extractBtn" disabled>Extract to Excel</button>
+      <button class="secondary" id="clearBtn">Clear All</button>
+    </div>
+
+    <div id="errorBanner" class="banner error hidden"></div>
+  </div>
+
+  <div class="card hidden" id="resultsCard">
+    <div class="results-header">
+      <h3>✅ Extraction complete</h3>
+      <span class="count" id="rowCount"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="resultsTable">
+        <thead><tr id="tableHead"></tr></thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+    <div class="actions">
+      <button class="primary" id="downloadBtn">⬇ Download Excel</button>
+    </div>
+    <div id="warnBanner" class="banner error hidden"></div>
+  </div>
+</div>
+
+<footer>Runs entirely on your own hosted instance.</footer>
+
+<script>
+const CLIENTS = [
+  { key: "amex", label: "Amex" },
+  { key: "airplay", label: "Airplay" },
+  { key: "novel", label: "Novel" },
+  { key: "pinelabs", label: "Pine Labs" },
+  { key: "aerom", label: "Aerom" },
+];
+
+let activeClient = CLIENTS[0].key;
+let selectedFiles = [];
+let currentSessionId = null;
+
+const tabsEl = document.getElementById("tabs");
+const dropzone = document.getElementById("dropzone");
+const fileInput = document.getElementById("fileInput");
+const fileListEl = document.getElementById("fileList");
+const extractBtn = document.getElementById("extractBtn");
+const clearBtn = document.getElementById("clearBtn");
+const errorBanner = document.getElementById("errorBanner");
+const resultsCard = document.getElementById("resultsCard");
+const tableHead = document.getElementById("tableHead");
+const tableBody = document.getElementById("tableBody");
+const rowCountEl = document.getElementById("rowCount");
+const downloadBtn = document.getElementById("downloadBtn");
+const warnBanner = document.getElementById("warnBanner");
+
+function renderTabs() {
+  tabsEl.innerHTML = "";
+  CLIENTS.forEach(c => {
+    const btn = document.createElement("button");
+    btn.className = "tab-btn" + (c.key === activeClient ? " active" : "");
+    btn.textContent = c.label;
+    btn.onclick = () => {
+      activeClient = c.key;
+      resetAll();
+      renderTabs();
+    };
+    tabsEl.appendChild(btn);
+  });
+}
+
+function renderFileList() {
+  fileListEl.innerHTML = "";
+  selectedFiles.forEach((file, idx) => {
+    const item = document.createElement("div");
+    item.className = "file-item";
+    item.innerHTML = `<span class="name">📄 ${file.name}</span>`;
+    const removeBtn = document.createElement("button");
+    removeBtn.textContent = "✕";
+    removeBtn.onclick = () => {
+      selectedFiles.splice(idx, 1);
+      renderFileList();
+      extractBtn.disabled = selectedFiles.length === 0;
+    };
+    item.appendChild(removeBtn);
+    fileListEl.appendChild(item);
+  });
+}
+
+function addFiles(fileArray) {
+  const pdfs = fileArray.filter(f => f.name.toLowerCase().endsWith(".pdf"));
+  const rejected = fileArray.length - pdfs.length;
+  selectedFiles = selectedFiles.concat(pdfs);
+  renderFileList();
+  extractBtn.disabled = selectedFiles.length === 0;
+  if (rejected > 0) {
+    showError(`${rejected} file(s) were skipped — only PDF files are allowed.`);
+  } else {
+    hideError();
+  }
+}
+
+function showError(msg, list) {
+  errorBanner.classList.remove("hidden");
+  let html = `<strong>⚠ ${msg}</strong>`;
+  if (list && list.length) {
+    html += "<ul>" + list.map(e => `<li>${e.file}: ${e.error}</li>`).join("") + "</ul>";
+  }
+  errorBanner.innerHTML = html;
+}
+function hideError() {
+  errorBanner.classList.add("hidden");
+  errorBanner.innerHTML = "";
+}
+
+function resetAll() {
+  selectedFiles = [];
+  currentSessionId = null;
+  renderFileList();
+  extractBtn.disabled = true;
+  extractBtn.innerHTML = "Extract to Excel";
+  extractBtn.disabled = true;
+  hideError();
+  resultsCard.classList.add("hidden");
+  fileInput.value = "";
+}
+
+dropzone.addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", (e) => addFiles(Array.from(e.target.files)));
+
+["dragenter", "dragover"].forEach(evt => {
+  dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.add("dragover"); });
+});
+["dragleave", "drop"].forEach(evt => {
+  dropzone.addEventListener(evt, (e) => { e.preventDefault(); dropzone.classList.remove("dragover"); });
+});
+dropzone.addEventListener("drop", (e) => {
+  const files = Array.from(e.dataTransfer.files);
+  addFiles(files);
+});
+
+clearBtn.addEventListener("click", resetAll);
+
+extractBtn.addEventListener("click", async () => {
+  if (selectedFiles.length === 0) return;
+
+  hideError();
+  extractBtn.disabled = true;
+  extractBtn.innerHTML = '<span class="spinner"></span>Extracting...';
+
+  const formData = new FormData();
+  selectedFiles.forEach(f => formData.append("files", f));
+
+  try {
+    const res = await fetch(`/api/process/${activeClient}`, { method: "POST", body: formData });
+    const data = await res.json();
+
+    if (!res.ok) {
+      const detail = data.detail || {};
+      showError(detail.message || "Extraction failed.", detail.errors);
+      resultsCard.classList.add("hidden");
+      return;
+    }
+
+    currentSessionId = data.session_id;
+    renderResults(data);
+
+    if (data.errors && data.errors.length) {
+      warnBanner.classList.remove("hidden");
+      warnBanner.innerHTML = `<strong>⚠ Some files had issues:</strong><ul>` +
+        data.errors.map(e => `<li>${e.file}: ${e.error}</li>`).join("") + `</ul>`;
+    } else {
+      warnBanner.classList.add("hidden");
+    }
+
+  } catch (err) {
+    showError("Network error — could not reach the server. Please try again.");
+  } finally {
+    extractBtn.disabled = false;
+    extractBtn.innerHTML = "Extract to Excel";
+  }
+});
+
+function renderResults(data) {
+  resultsCard.classList.remove("hidden");
+  rowCountEl.textContent = `${data.row_count} row(s)` + (data.preview_truncated ? " (preview limited to first 200)" : "");
+
+  tableHead.innerHTML = data.columns.map(c => `<th>${c}</th>`).join("");
+  tableBody.innerHTML = data.rows.map(row =>
+    "<tr>" + data.columns.map(c => `<td>${row[c] ?? ""}</td>`).join("") + "</tr>"
+  ).join("");
+
+  resultsCard.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+downloadBtn.addEventListener("click", () => {
+  if (!currentSessionId) return;
+  window.location.href = `/api/download/${currentSessionId}`;
+});
+
+renderTabs();
+</script>
+
+</body>
+</html>
